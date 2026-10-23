@@ -1,3 +1,33 @@
+# MonSter: faster inference fork
+
+> **You are on `cuda-kernels`.** Research fork of [Junda24/MonSter](https://github.com/Junda24/MonSter) (base `49016c9`; `main` mirrors upstream). Custom CUDA kernels, so this branch does not export to ONNX / TensorRT; there is no `portable` branch for this repo.
+>
+> What needs the kernels: the fp16 fast path in the `*_fast.py` / `inference.py` files (cuDNN-frontend fp16-accumulate convolutions, CUTLASS fused-epilogue convs, cost-volume / correlation kernels). Upstream's own modules and weights are unchanged.
+>
+> Build: prebuilt cubins (sm_80/86/89/90/120) and one CUTLASS shared library sit in `prebuilt/` next to the code (each < 3 MB). If a prebuilt does not match your GPU or the source hash, the code compiles it with `nvcc` from `CUDA_HOME` (default `/usr/local/cuda`) into `~/.cache`; the CUTLASS library is only rebuilt from source with `CUTLASS_DIR` set (CUTLASS v4.7.1 headers). fp16-accumulate convs need `pip install nvidia-cudnn-frontend`.
+>
+
+> Extra dependency: [`fastbb`](https://github.com/fastforks/fastbb) (fast backbones), `pip install` it or put it on `PYTHONPATH`.
+>
+
+> Licence, as upstream (MonSter Model License v1.0, see LICENSE)
+
+
+Released weights, RTX 5060 Ti 16 GB, torch 2.14.1+cu130, 2026-10-23. KITTI = 000000_10 (1242x375), Midd-H = Middlebury trainingH Motorcycle (1482x994). Median of 10 runs after warm-up (the first-call column is the very first call of a fresh process). Peak memory = torch peak allocated / reserved over the whole run (both sizes). EPE = mean over 3 ETH3D + 3 Middlebury-H training pairs (short check, not a benchmark; a pair that ran out of memory in any row is left out of the EPE mean of all rows). flags = set from the driver only, no upstream source edit: `torch.inference_mode()`, `cudnn.benchmark=True`, TF32 allowed, plus the fastest combination that keeps EPE within noise (listed in brackets in the row). `torch.compile` is not part of the row.
+
+
+
+| version | KITTI ms | Midd-H ms | speed-up at H (vs flags / vs upstream) | peak MB (alloc / reserved) | startup / first call / new size | ETH3D EPE | Midd-H EPE |
+|---|---|---|---|---|---|---|---|
+| upstream (fp32) | 991.0 | 4279.1 | 1.00x | 6388 / 7520 | 9.3 s / 1.24 s / 4.28 s | 0.217 | 5.246 |
+| upstream + flags (fp16 autocast, cudnn.benchmark, TF32, inference_mode) | 661.1 | 3152.3 | 1.00x / 1.36x | 10636 / 12490 | 7.0 s / 4.34 s / 8.96 s | 0.215 | 5.255 |
+| **cuda-kernels** | 182.9 | 654.9 | 4.81x / 6.53x | 2356 / 2658 | 7.3 s / 0.56 s / 0.73 s | 0.220 | 5.251 |
+
+Max / mean abs disparity difference cuda-kernels vs upstream: 89.4 px / 0.0495 px (KITTI + 6 EPE pairs; the maximum is set by a few single pixels).
+
+
+---
+
 # 🚀 MonSter (CVPR 2025 Highlight) 🚀 
 
 <p align="center">
